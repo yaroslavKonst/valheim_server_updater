@@ -6,7 +6,7 @@
 
 int main(int argc, char** argv)
 {
-	int pidfile_fd = open("pidfile", O_RDONLY);
+	int pidfile_fd = open("/tmp/vu_pidfile", O_RDONLY);
 
 	if (pidfile_fd < 0) {
 		printf("pidfile is not found.\n");

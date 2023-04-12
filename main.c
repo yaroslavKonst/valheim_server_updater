@@ -46,33 +46,32 @@ int wait_process(int pid)
 int start_steam()
 {
 	char* args[10];
-	args[0] = "./steamcmd";
+	args[0] = "steamcmd";
 	args[1] = "+login";
 	args[2] = "anonymous";
-	args[3] = "steamcmd";
-	args[4] = "steamcmd";
-	args[5] = "steamcmd";
-	args[6] = "steamcmd";
-	args[7] = "steamcmd";
-	args[8] = NULL;
+	args[3] = "+app_update";
+	args[4] = "896660";
+	args[5] = "+quit";
+	args[6] = NULL;
 
-	return start_process(args[0], args, "~");
+	return start_process(args[0], args, "/home/yaroslav");
 }
 
 int start_server()
 {
 	char* args[10];
 	args[0] = "./server";
-	args[1] = "world";
-	args[2] = "qq";
-	args[3] = "steamcmd";
-	args[4] = "steamcmd";
-	args[5] = "steamcmd";
-	args[6] = "steamcmd";
-	args[7] = "steamcmd";
-	args[8] = NULL;
+	args[1] = "-name";
+	args[2] = "Server cool";
+	args[3] = "-world";
+	args[4] = "brandnewworld";
+	args[5] = "-port";
+	args[6] = "2456";
+	args[7] = "-password";
+	args[8] = "gmrules";
+	args[9] = NULL;
 
-	return start_process(args[0], args, "~");
+	return start_process(args[0], args, "/home/yaroslav");
 }
 
 int update(int server_pid)
@@ -115,7 +114,7 @@ void write_pidfile()
 {
 	int self_pid = getpid();
 
-	int pid_file_fd = open("pidfile", O_WRONLY | O_CREAT | O_TRUNC, 0444);
+	int pid_file_fd = open("/tmp/vu_pidfile", O_WRONLY | O_CREAT | O_TRUNC, 0444);
 	write(pid_file_fd, &self_pid, sizeof(int));
 	close(pid_file_fd);
 }
@@ -152,7 +151,7 @@ int main()
 	kill(server_pid, SIGINT);
 	wait_process(server_pid);
 
-	unlink("pidfile");
+	unlink("/tmp/vu_pidfile");
 
 	return 0;
 }
