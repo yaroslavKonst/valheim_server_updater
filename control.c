@@ -6,17 +6,19 @@
 
 int main(int argc, char** argv)
 {
-	int pidfile_fd = open("/tmp/vu_pidfile", O_RDONLY);
+	int pidfileFd = open("/tmp/vu_pidfile", O_RDONLY);
 
-	if (pidfile_fd < 0) {
-		printf("pidfile is not found.\n");
+	if (pidfileFd < 0) {
+		printf("Pidfile not found.\n");
+		printf("Server may not be started.\n");
 		return 2;
 	}
 
 	int pid;
 
-	if (read(pidfile_fd, &pid, sizeof(int)) != sizeof(int)) {
-		printf("pidfile is not valid.\n");
+	if (read(pidfileFd, &pid, sizeof(int)) != sizeof(int)) {
+		printf("Pidfile is not valid.\n");
+		printf("Delete it if server is not running.\n");
 		return 3;
 	}
 

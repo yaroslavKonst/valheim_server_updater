@@ -5,48 +5,54 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <string.h>
+#include <errno.h>
 
-int work;
+int Work;
 
-void signal_handler(int signum)
+void SignalHandler(int signum)
 {
 	if (signum == SIGUSR2) {
-		work = 0;
+		Work = 0;
 	}
 }
 
-int start_process(char* exe, char** args, char* work_dir)
+int StartProcess(char* exe, char** args, char* workDir)
 {
+	printf("Starting %s.\n", exe);
+
 	int pid = fork();
 
 	if (pid == 0) {
-		if (work_dir) {
-			chdir(work_dir);
+		if (workDir) {
+			chdir(workDir);
 		}
 
 		execvp(exe, args);
+		printf("Start unsuccessful: %s.\n", strerror(errno));
 		exit(10);
 	}
 
 	return pid;
 }
 
-int wait_process(int pid)
+int WaitProcess(int pid)
 {
 	int status;
 	waitpid(pid, &status, 0);
 
 	if (WIFEXITED(status)) {
 		return WEXITSTATUS(status);
+	} else if (WIFSIGNALED(status)) {
+		return WTERMSIG(status);
 	} else {
 		return -1;
 	}
 }
 
-int start_steam()
+int StartSteam()
 {
 	char* args[10];
-	args[0] = "steamcmd";
+	args[0] = "./steamcmd";
 	args[1] = "+login";
 	args[2] = "anonymous";
 	args[3] = "+app_update";
@@ -54,10 +60,10 @@ int start_steam()
 	args[5] = "+quit";
 	args[6] = NULL;
 
-	return start_process(args[0], args, "/home/yaroslav");
+	return StartProcess(args[0], args, "/home/yaroslav");
 }
 
-int start_server()
+int StartServer()
 {
 	char* args[10];
 	args[0] = "./server";
@@ -71,32 +77,38 @@ int start_server()
 	args[8] = "gmrules";
 	args[9] = NULL;
 
-	return start_process(args[0], args, "/home/yaroslav");
+	return StartProcess(args[0], args, "/home/yaroslav");
 }
 
-int update(int server_pid)
+int Update(int serverPid)
 {
-	kill(server_pid, SIGINT);
+	kill(serverPid, SIGINT);
+	WaitProcess(serverPid);
 
-	wait_process(server_pid);
-
-	int steam_pid = start_steam();
-	wait_process(steam_pid);
-	return start_server();
+	int steamPid = StartSteam();
+	WaitProcess(steamPid);
+	return StartServer();
 }
 
-void set_signal_action()
+void SetSignalAction()
 {
 	struct sigaction sigact;
 	memset(&sigact, 0, sizeof(struct sigaction));
-	sigact.sa_handler = signal_handler;
+	sigact.sa_handler = SignalHandler;
 
 	sigaction(SIGUSR1, &sigact, NULL);
 	sigaction(SIGUSR2, &sigact, NULL);
 }
 
-void daemonize()
+void Daemonize()
 {
+	int pidFileFd = open("/tmp/vu_pidfile", O_RDONLY);
+
+	if (pidFileFd >= 0) {
+		printf("Daemon is already running.\n");
+		exit(10);
+	}
+
 	if (fork()) {
 		exit(0);
 	}
@@ -105,51 +117,78 @@ void daemonize()
 		exit(1);
 	}
 
-	int null_fd = open("/dev/null", O_RDONLY);
-	dup2(null_fd, 0);
-	close(null_fd);
+	int nullFd = open("/dev/null", O_RDONLY);
+	dup2(nullFd, 0);
+	close(nullFd);
+	chdir("/");
 }
 
-void write_pidfile()
+void WritePidfile()
 {
-	int self_pid = getpid();
+	int selfPid = getpid();
 
-	int pid_file_fd = open("/tmp/vu_pidfile", O_WRONLY | O_CREAT | O_TRUNC, 0444);
-	write(pid_file_fd, &self_pid, sizeof(int));
-	close(pid_file_fd);
+	int pidFileFd = open(
+		"/tmp/vu_pidfile",
+		O_WRONLY | O_CREAT | O_TRUNC | O_EXCL,
+		0444);
+
+	if (pidFileFd < 0) {
+		exit(10);
+	}
+
+	write(pidFileFd, &selfPid, sizeof(int));
+	close(pidFileFd);
 }
 
-void init_log()
+void InitLog(char* logFile)
 {
-	int log_fd = open("log.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
-	dup2(log_fd, 1);
-	dup2(log_fd, 2);
-	close(log_fd);
+	int logFd = -1;
+
+	if (logFile) {
+		logFd = open(logFile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+	}
+
+	if (logFd < 0) {
+		logFd = open("/dev/null", O_WRONLY);
+	}
+
+	dup2(logFd, 1);
+	dup2(logFd, 2);
+	close(logFd);
 }
 
-int main()
+int main(int argc, char** argv)
 {
-	work = 1;
+	Work = 1;
 
-	daemonize();
-	init_log();
-	write_pidfile();
-	set_signal_action();
+	char* logFile = NULL;
 
-	int server_pid = start_server();
+	if (argc > 1) {
+		logFile = argv[1];
+		printf("Log: %s.\n", argv[1]);
+	}
+
+	Daemonize();
+	WritePidfile();
+	SetSignalAction();
+	InitLog(logFile);
+
+	printf("started Valheim control daemon.\n");
+
+	int serverPid = StartServer();
 
 	while (1) {
 		pause();
 
-		if (!work) {
+		if (!Work) {
 			break;
 		}
 
-		server_pid = update(server_pid);
+		serverPid = Update(serverPid);
 	}
 
-	kill(server_pid, SIGINT);
-	wait_process(server_pid);
+	kill(serverPid, SIGINT);
+	WaitProcess(serverPid);
 
 	unlink("/tmp/vu_pidfile");
 
