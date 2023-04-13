@@ -53,7 +53,7 @@ int WaitProcess(int pid)
 int StartSteam()
 {
 	char* args[10];
-	args[0] = "./steamcmd";
+	args[0] = "steamcmd";
 	args[1] = "+login";
 	args[2] = "anonymous";
 	args[3] = "+app_update";
@@ -69,19 +69,19 @@ int StartSteam()
 int StartServer()
 {
 	char* args[10];
-	args[0] = "./server";
+	args[0] = "./valheim_server.x86_64";
 	args[1] = "-name";
 	args[2] = "Server cool";
-	args[3] = "-world";
-	args[4] = "brandnewworld";
-	args[5] = "-port";
-	args[6] = "2456";
+	args[3] = "-port";
+	args[4] = "2456";
+	args[5] = "-world";
+	args[6] = "brandnewworld";
 	args[7] = "-password";
 	args[8] = "gmrules";
 	args[9] = NULL;
 
 	char* home = getenv("HOME");
-	char* pathToServer = "/.local/share/Steam/steamapps/common";
+	char* pathToServer = "/Steam/steamapps/common/Valheim dedicated server";
 
 	char* dir = malloc(strlen(home) + strlen(pathToServer) + 1);
 	strcpy(dir, home);
@@ -185,6 +185,8 @@ int main(int argc, char** argv)
 	WritePidfile();
 	SetSignalAction();
 	InitLog(logFile);
+
+	setenv("LD_LIBRARY_PATH", "./linux64:", 1);
 
 	printf("started Valheim control daemon.\n");
 
