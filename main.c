@@ -25,6 +25,7 @@ int StartProcess(char* exe, char** args, char* workDir)
 	if (pid == 0) {
 		if (workDir) {
 			chdir(workDir);
+			printf("Set working directory: %s.\n", workDir);
 		}
 
 		execvp(exe, args);
@@ -60,7 +61,9 @@ int StartSteam()
 	args[5] = "+quit";
 	args[6] = NULL;
 
-	return StartProcess(args[0], args, "/home/yaroslav");
+	char* home = getenv("HOME");
+
+	return StartProcess(args[0], args, home);
 }
 
 int StartServer()
@@ -77,7 +80,17 @@ int StartServer()
 	args[8] = "gmrules";
 	args[9] = NULL;
 
-	return StartProcess(args[0], args, "/home/yaroslav");
+	char* home = getenv("HOME");
+	char* pathToServer = "/.local/share/Steam/steamapps/common";
+
+	char* dir = malloc(strlen(home) + strlen(pathToServer) + 1);
+	strcpy(dir, home);
+	strcat(dir, pathToServer);
+
+	int pid = StartProcess(args[0], args, dir);
+
+	free(dir);
+	return pid;
 }
 
 int Update(int serverPid)
