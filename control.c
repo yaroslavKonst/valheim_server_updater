@@ -30,10 +30,11 @@ int main(int argc, char** argv)
 
 	if (!strcmp(argv[1], "stop")) {
 		kill(pid, SIGUSR2);
-	}
-
-	if (!strcmp(argv[1], "update")) {
+	} else if (!strcmp(argv[1], "update")) {
 		kill(pid, SIGUSR1);
+	} else {
+		printf("Specify 'stop' or 'update' argument.\n");
+		return 1;
 	}
 
 	return 0;
