@@ -66,18 +66,21 @@ int StartSteam()
 	return StartProcess(args[0], args, home);
 }
 
-int StartServer()
+int StartServer(
+	char* serverName,
+	char* worldName,
+	char* password)
 {
 	char* args[10];
 	args[0] = "./valheim_server.x86_64";
 	args[1] = "-name";
-	args[2] = "Server cool";
+	args[2] = serverName;
 	args[3] = "-port";
 	args[4] = "2456";
 	args[5] = "-world";
-	args[6] = "brandnewworld";
+	args[6] = worldName;
 	args[7] = "-password";
-	args[8] = "gmrules";
+	args[8] = password;
 	args[9] = NULL;
 
 	char* home = getenv("HOME");
@@ -93,14 +96,18 @@ int StartServer()
 	return pid;
 }
 
-int Update(int serverPid)
+int Update(
+	int serverPid,
+	char* serverName,
+	char* worldName,
+	char* password)
 {
 	kill(serverPid, SIGINT);
 	WaitProcess(serverPid);
 
 	int steamPid = StartSteam();
 	WaitProcess(steamPid);
-	return StartServer();
+	return StartServer(serverName, worldName, password);
 }
 
 void SetSignalAction()
@@ -176,9 +183,25 @@ int main(int argc, char** argv)
 
 	char* logFile = NULL;
 
-	if (argc > 1) {
-		logFile = argv[1];
-		printf("Log: %s.\n", argv[1]);
+	if (argc < 4) {
+		printf("server server_name world_name password [log_file]\n");
+		printf("Server name, world name and password are required.\n");
+		return 1;
+	}
+
+	char* serverName = argv[1];
+	char* worldName = argv[2];
+	char* password = argv[3];
+
+	if (argc > 5) {
+		printf("server server_name world_name password [log_file]\n");
+		printf("Other arguments are not required.\n");
+		return 1;
+	}
+
+	if (argc == 5) {
+		logFile = argv[4];
+		printf("Log: %s.\n", argv[4]);
 	}
 
 	Daemonize();
@@ -190,7 +213,7 @@ int main(int argc, char** argv)
 
 	printf("started Valheim control daemon.\n");
 
-	int serverPid = StartServer();
+	int serverPid = StartServer(serverName, worldName, password);
 
 	while (1) {
 		pause();
@@ -199,7 +222,7 @@ int main(int argc, char** argv)
 			break;
 		}
 
-		serverPid = Update(serverPid);
+		serverPid = Update(serverPid, serverName, worldName, password);
 	}
 
 	kill(serverPid, SIGINT);
