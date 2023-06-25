@@ -4,8 +4,11 @@ CC=gcc -Wall
 
 all: server control
 
-server: main.c
-	$(CC) -o server main.c
+server: build/main.o build/cmd_parse.o
+	$(CC) -o server build/main.o build/cmd_parse.o
 
-control: control.c
-	$(CC) -o control control.c
+control: build/control.o build/cmd_parse.o
+	$(CC) -o control build/control.o build/cmd_parse.o
+
+build/%.o: %.c
+	$(CC) -c $< -o $@

@@ -6,13 +6,21 @@
 #include <fcntl.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
-int Work;
+#include "global_values.h"
+#include "cmd_parse.h"
+
+int G_Work;
+int G_Update;
 
 void SignalHandler(int signum)
 {
 	if (signum == SIGUSR2) {
-		Work = 0;
+		G_Work = 0;
+	} else {
+		G_Update = 1;
 	}
 }
 
@@ -107,6 +115,7 @@ int Update(
 
 	int steamPid = StartSteam();
 	WaitProcess(steamPid);
+
 	return StartServer(serverName, worldName, password);
 }
 
@@ -177,31 +186,72 @@ void InitLog(char* logFile)
 	close(logFd);
 }
 
+int InitSocket()
+{
+	int sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+
+	if (sockFd == -1) {
+		printf("Failed to create socket.\n");
+		printf("%s.\n", strerror(errno));
+		return -1;
+	}
+
+	struct sockaddr_in addr;
+	memset(&addr, 0, sizeof(addr));
+
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(DGRAM_PORT_NUMBER);
+	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	int stat = bind(sockFd, (struct sockaddr*)&addr, sizeof(addr));
+
+	if (stat == -1) {
+		printf("Failed to bind socket.\n");
+		printf("%s.\n", strerror(errno));
+		close(sockFd);
+		return -1;
+	}
+
+	return sockFd;
+}
+
 int main(int argc, char** argv)
 {
-	Work = 1;
+	G_Work = 1;
+	G_Update = 0;
 
-	char* logFile = NULL;
+	struct CmdData cmd = ParseCmd(argc, argv);
+	PrintCmd(cmd);
 
-	if (argc < 4) {
-		printf("server server_name world_name password [log_file]\n");
-		printf("Server name, world name and password are required.\n");
-		return 1;
+	char* serverName = GetCmdValue(cmd, "server");
+	char* worldName = GetCmdValue(cmd, "world");
+	char* password = GetCmdValue(cmd, "password");
+	char* logFile = GetCmdValue(cmd, "log");
+
+	int argsCorrect = 1;
+
+	if (serverName == NULL) {
+		printf("Server name is not specified. Use '-server' key.\n");
+		argsCorrect = 0;
 	}
 
-	char* serverName = argv[1];
-	char* worldName = argv[2];
-	char* password = argv[3];
-
-	if (argc > 5) {
-		printf("server server_name world_name password [log_file]\n");
-		printf("Other arguments are not required.\n");
-		return 1;
+	if (worldName == NULL) {
+		printf("World name is not specified. Use '-world' key.\n");
+		argsCorrect = 0;
 	}
 
-	if (argc == 5) {
-		logFile = argv[4];
-		printf("Log: %s.\n", argv[4]);
+	if (password == NULL) {
+		printf("Password is not specified. Use '-password' key.\n");
+		argsCorrect = 0;
+	}
+
+	if (logFile == NULL) {
+		printf("Log file is not specified. Log will not be written.\n");
+		printf("Use '-log' key to set log file.\n");
+	}
+
+	if (!argsCorrect) {
+		return 1;
 	}
 
 	Daemonize();
@@ -213,22 +263,49 @@ int main(int argc, char** argv)
 
 	printf("started Valheim control daemon.\n");
 
+	int sockFd = InitSocket();
+
 	int serverPid = StartServer(serverName, worldName, password);
 
 	while (1) {
-		pause();
+		if (sockFd != -1) {
+			int buf;
+			int msglen = recv(sockFd, &buf, sizeof(buf), 0);
 
-		if (!Work) {
+			if (msglen == sizeof(buf)) {
+				if (buf == UPDATE_COMMAND) {
+					G_Update = 1;
+				} else if (buf == SHUTDOWN_COMMAND) {
+					G_Work = 0;
+				}
+			}
+		} else {
+			pause();
+		}
+
+		if (!G_Work) {
 			break;
 		}
 
-		serverPid = Update(serverPid, serverName, worldName, password);
+		if (G_Update) {
+			serverPid = Update(
+				serverPid,
+				serverName,
+				worldName,
+				password);
+
+			G_Update = 0;
+		}
 	}
 
 	kill(serverPid, SIGINT);
 	WaitProcess(serverPid);
 
+	close(sockFd);
+
 	unlink("/tmp/vu_pidfile");
+
+	FreeCmd(cmd);
 
 	return 0;
 }

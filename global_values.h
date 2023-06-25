@@ -1,0 +1,8 @@
+#ifndef GLOBAL_VALUES
+#define GLOBAL_VALUES
+
+#define DGRAM_PORT_NUMBER 25879
+#define UPDATE_COMMAND 145
+#define SHUTDOWN_COMMAND 150
+
+#endif
