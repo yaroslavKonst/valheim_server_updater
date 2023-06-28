@@ -37,6 +37,7 @@ int Local(char* command)
 	if (pidfileFd < 0) {
 		printf("Pidfile not found.\n");
 		printf("Server may not be started.\n");
+		printf("Use '-remote' key to send a command to remote host.\n");
 		return 2;
 	}
 
@@ -76,7 +77,7 @@ int Remote(char* remote, char* command)
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(DGRAM_PORT_NUMBER);
 	if (!inet_aton(remote, &addr.sin_addr)) {
-		printf("Specified address %s is invalid.", remote);
+		printf("Specified address %s is invalid.\n", remote);
 		close(sockFd);
 		return 1;
 	}
